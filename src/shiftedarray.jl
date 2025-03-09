@@ -89,7 +89,7 @@ function shiftedarray(v::AbstractArray{T, N}, shifts, default::M) where {T, N, M
 end
 
 function ShiftedArray(v::AbstractArray, n = (); default = ShiftedArrays.default(v))
-    return if v isa ShiftedArray && default === ShiftedArrays.default(v)
+    return if (v isa MutableShiftedArray || v isa ShiftedArray) && default === ShiftedArrays.default(v)
         shifts = map(+, ShiftedArrays.shifts(v), padded_tuple(v, n))
         shiftedarray(parent(v), shifts, default)
     else

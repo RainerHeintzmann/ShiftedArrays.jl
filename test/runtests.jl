@@ -77,6 +77,58 @@ end
                                  0  1         5         9      ])
 end
 
+@testset "MutableShiftedArray" begin
+    v = collect(reshape(1:16, 4, 4))  # index assignment to reshaped ranges is not supported
+    v = opt_convert(v);
+    @test all(v .== MutableShiftedArray(v))
+    sv = MutableShiftedArray(v, (-2, 0))
+    @test length(sv) == 16
+    @test sv[1, 3] == 11
+    @test ismissing(sv[3, 3])
+    @test shifts(sv) == (-2,0)
+    @test isequal(sv, MutableShiftedArray(v, -2))
+    @test isequal(@inferred(MutableShiftedArray(v, (2,))), @inferred(MutableShiftedArray(v, 2)))
+    @test isequal(@inferred(MutableShiftedArray(v)), @inferred(MutableShiftedArray(v, (0, 0))))
+    s = MutableShiftedArray(v, (0, -2))
+    @test isequal(collect(s), [ 9 13 missing missing;
+                               10 14 missing missing;
+                               11 15 missing missing;
+                               12 16 missing missing])
+    sneg = MutableShiftedArray(v, (0, -2), default = -100)
+    @test all(sneg .== coalesce.(s, default(sneg)))
+    @test checkbounds(Bool, sv, 2, 2)
+    @test !checkbounds(Bool, sv, 123, 123)
+    svnest = MutableShiftedArray(MutableShiftedArray(v, (1, 1)), 2)
+    sv = MutableShiftedArray(v, (3, 1))
+    @test sv === svnest
+    sv = MutableShiftedArray(v, 2, default = nothing)
+    sv1 = MutableShiftedArray(sv, (1, 1))
+    sv2 = MutableShiftedArray(sv, (1, 1), default = 0)
+    @test isequal(collect(sv1), [nothing   nothing   nothing   nothing
+                                 nothing   nothing   nothing   nothing
+                                 nothing   nothing   nothing   nothing
+                                 nothing  1         5         9      ])
+    @test isequal(collect(sv2), [0  0         0         0
+                                 0   nothing   nothing   nothing
+                                 0   nothing   nothing   nothing
+                                 0  1         5         9      ])
+
+    # test some mutation operations
+    sv[1,1] = 0
+    @test sv[1,1] == nothing
+    sv[3,3] = 0
+    @test sv[3,3] == 0
+    @test v[1,3] == 0
+    @test sv1[4,4] == 0
+    sv1[4,4] = 55
+    @test v[1,3] == 55
+    sv1[:,:] .= -1
+    @test v[1,1] == -1
+    @test v[1,4] == 13
+    sv2[:] .= -2
+    @test sv2[4,2] == -2
+end
+
 @testset "padded_tuple" begin
     v = rand(2, 2)
     v = opt_convert(v);
