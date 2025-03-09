@@ -48,15 +48,6 @@ julia> s = ShiftedArray(v, (1,))
  3
  5
 
-julia> v = [1, 3, 5, 4];
-
-julia> s = ShiftedArray(v, (1,))
-4-element ShiftedVector{Int64, Missing, Vector{Int64}}:
-  missing
- 1
- 3
- 5
-
 julia> copy(s)
 4-element Vector{Union{Missing, Int64}}:
   missing

@@ -5,6 +5,8 @@
 ```@docs
 ShiftedArray
 ShiftedVector
+MutableShiftedArray
+MutableShiftedVector
 CircShiftedArray
 CircShiftedVector
 ```
