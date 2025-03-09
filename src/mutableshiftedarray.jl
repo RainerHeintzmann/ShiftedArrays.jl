@@ -20,16 +20,7 @@ The recommended constructor is `MutableShiftedArray(parent, shifts; default = mi
 julia> v = [1, 3, 5, 4];
 
 julia> s = MutableShiftedArray(v, (1,))
-4-element MutableShiftedArray{Int64, Missing, Vector{Int64}}:
-  missing
- 1
- 3
- 5
-
-julia> v = [1, 3, 5, 4];
-
-julia> s = MutableShiftedArray(v, (1,))
-4-element MutableShiftedArray{Int64, Missing, Vector{Int64}}:
+4-element MutableShiftedVector{Int64, Missing, Vector{Int64}}:
   missing
  1
  3
