@@ -12,8 +12,7 @@ Base.Broadcast.BroadcastStyle(::Type{T})  where {T<:CircShiftedArray} = Base.Bro
 # lets do this for the ShiftedArray type
 Adapt.adapt_structure(to, x::ShiftedArray{T, M, N}) where {T, M, N} = ShiftedArray(adapt(to, parent(x)), shifts(x); default=ShiftedArrays.default(x));
 
-# function Base.Broadcast.BroadcastStyle(::Type{T})  where (CT,CN,CD,T<: ShiftedArray{<:Any,<:Any,<:Any,<:CuArray})
-function Base.Broadcast.BroadcastStyle(::Type{ShiftedArray{<:Any,<:Any,<:Any, <:CuArray{T,N,CD}}}) where {T,N,CD}
+function Base.Broadcast.BroadcastStyle(::Type{T})  where {T2, N, CD, T<:ShiftedArray{<:Any,<:Any,<:Any,<:CuArray{T2,N,CD}}}
     CUDA.CuArrayStyle{N,CD}()
 end
 
@@ -21,9 +20,8 @@ end
 # lets do this for the ShiftedArray type
 Adapt.adapt_structure(to, x::MutableShiftedArray{T, M, N}) where {T, M, N} = MutableShiftedArray(adapt(to, parent(x)), shifts(x); default=ShiftedArrays.default(x));
 
-# function Base.Broadcast.BroadcastStyle(::Type{T})  where (CT,CN,CD,T<: ShiftedArray{<:Any,<:Any,<:Any,<:CuArray})
-function Base.Broadcast.BroadcastStyle(::Type{MutableShiftedArray{<:Any,<:Any,<:Any, <:CuArray{T,N,CD}}}) where {T,N,CD}
-    CUDA.CuArrayStyle{N,CD}()
+function Base.Broadcast.BroadcastStyle(::Type{T})  where {T2, N, CD, T<:MutableShiftedArray{<:Any,<:Any,<:Any,<:CuArray{T2,N,CD}}}
+        CUDA.CuArrayStyle{N,CD}()
 end
 
 # function Base.show(io::IO, mm::MIME"text/plain", cs::CircShiftedArray) 
