@@ -14,6 +14,7 @@ end
 function run_all_tests()
     @testset "ShiftedVector" begin
         v = [1, 3, 5, 4]
+        v = opt_convert(v);
         @test all(v .== ShiftedVector(v))
         sv = ShiftedVector(v, -1)
         @test isequal(sv, ShiftedVector(v, (-1,)))
@@ -39,6 +40,7 @@ function run_all_tests()
     
     @testset "ShiftedArray" begin
         v = reshape(1:16, 4, 4)
+        v = opt_convert(v);
         @test all(v .== ShiftedArray(v))
         sv = ShiftedArray(v, (-2, 0))
         @test length(sv) == 16
@@ -75,6 +77,7 @@ function run_all_tests()
     
     @testset "padded_tuple" begin
         v = rand(2, 2)
+        v = opt_convert(v);
         @test (1, 0) == @inferred ShiftedArrays.padded_tuple(v, 1)
         @test (0, 0) == @inferred ShiftedArrays.padded_tuple(v, ())
         @test (3, 0) == @inferred ShiftedArrays.padded_tuple(v, (3,))
@@ -93,11 +96,12 @@ function run_all_tests()
     
     @testset "CircShiftedVector" begin
         v = [1, 3, 5, 4]
+        v = opt_convert(v);
         @test all(v .== CircShiftedVector(v))
         sv = CircShiftedVector(v, -1)
         @test isequal(sv, CircShiftedVector(v, (-1,)))
         @test length(sv) == 4
-        @test all(sv .== [3, 5, 4, 1])
+        @test all(sv .== opt_convert([3, 5, 4, 1]))
         diff = v .- sv
         @test diff == [-2, -2, 1, 3]
         @test shifts(sv) == (3,)
@@ -121,6 +125,7 @@ function run_all_tests()
     
     @testset "CircShiftedArray" begin
         v = reshape(1:16, 4, 4)
+        v = opt_convert(v);
         @test all(v .== CircShiftedArray(v))
         sv = CircShiftedArray(v, (-2, 0))
         @test length(sv) == 16
@@ -141,6 +146,7 @@ function run_all_tests()
     
     @testset "circshift" begin
         v = reshape(1:16, 4, 4)
+        v = opt_convert(v);
         @test all(circshift(v, (1, -1)) .== ShiftedArrays.circshift(v, (1, -1)))
         @test all(circshift(v, (1,)) .== ShiftedArrays.circshift(v, (1,)))
         @test all(circshift(v, 3) .== ShiftedArrays.circshift(v, 3))
@@ -174,6 +180,7 @@ function run_all_tests()
     
     @testset "laglead" begin
         v = [1, 3, 8, 12]
+        v = opt_convert(v);
         diff = v .- ShiftedArrays.lag(v)
         @test isequal(diff, [missing, 2, 5, 4])
     
@@ -192,7 +199,7 @@ function run_all_tests()
     
         @test ShiftedArrays.lag(ShiftedArrays.lag(v, 1), 2) === ShiftedArrays.lag(v, 3)
         @test ShiftedArrays.lead(ShiftedArrays.lead(v, 1), 2) === ShiftedArrays.lead(v, 3)
-    end    
+    end
 end
 
 use_cuda=false
