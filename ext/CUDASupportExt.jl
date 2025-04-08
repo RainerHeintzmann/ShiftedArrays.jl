@@ -1,4 +1,4 @@
-module CUDASupportExt_SA
+module CUDASupportExt
 using CUDA 
 using Adapt
 using ShiftedArrays
@@ -12,7 +12,7 @@ function get_base_arr(arr::AbstractArray)
 end
 
 # define a number of Union types to not repeat all definitions for each type
-AllShiftedType = Union{ShiftedArrays.CircShiftedArray{<:Any,<:Any,<:Any}, ShiftedArrays.ShiftedArray{<:Any,<:Any,<:Any}}
+AllShiftedType = Union{CircShiftedArray{<:Any,<:Any,<:Any}, ShiftedArray{<:Any,<:Any,<:Any,<:Any}}
 
 # these are special only if a CuArray is wrapped
 
@@ -21,16 +21,17 @@ AllSubArrayType = Union{SubArray{<:Any, <:Any, <:AllShiftedType, <:Any, <:Any},
                         SubArray{<:Any, <:Any, <:Base.ReshapedArray{<:Any, <:Any, <:AllShiftedType, <:Any}, <:Any, <:Any}}
 AllShiftedAndViews = Union{AllShiftedType, AllSubArrayType}
 
-AllShiftedTypeCu{N, CD} = Union{ShiftedArrays.CircShiftedArray{<:Any,<:Any,<:CuArray{<:Any,N,CD}}, ShiftedArrays.ShiftedArray{<:Any,<:Any,<:CuArray{<:Any,N,CD}}}
+AllShiftedTypeCu{N, CD} = Union{CircShiftedArray{<:Any,<:Any,<:CuArray{<:Any,N,CD}}, ShiftedArray{<:Any,<:Any,<:Any,<:CuArray{<:Any,N,CD}}}
 AllSubArrayTypeCu{N, CD} = Union{SubArray{<:Any, <:Any, <:AllShiftedTypeCu{N,CD}, <:Any, <:Any},
                                  Base.ReshapedArray{<:Any, <:Any, <:AllShiftedTypeCu{N,CD}, <:Any},
                                  SubArray{<:Any, <:Any, <:Base.ReshapedArray{<:Any, <:Any, <:AllShiftedTypeCu{N,CD}, <:Any}, <:Any, <:Any}}
 AllShiftedAndViewsCu{N, CD} = Union{AllShiftedTypeCu{N, CD}, AllSubArrayTypeCu{N, CD}}
 
-Adapt.adapt_structure(to, x::ShiftedArrays.CircShiftedArray{T, N, S}) where {T, N, S} = ShiftedArrays.CircShiftedArray(adapt(to, parent(x)), ShiftedArrays.shifts(x));
-Adapt.adapt_structure(to, x::ShiftedArrays.ShiftedArray{T, N, S}) where {T, N, S} = ShiftedArrays.ShiftedArray(adapt(to, parent(x)), ShiftedArrays.shifts(x));
+Adapt.adapt_structure(to, x::CircShiftedArray{T, N, S}) where {T, N, S} = CircShiftedArray(adapt(to, parent(x)), shifts(x));
+Adapt.adapt_structure(to, x::ShiftedArray{T, V, N, S}) where {T, V, N, S} = ShiftedArray(adapt(to, parent(x)), shifts(x), default=V);
 
 function Base.Broadcast.BroadcastStyle(::Type{T})  where {N, CD, T<:AllShiftedTypeCu{N, CD}}
+    @show "hi"
     CUDA.CuArrayStyle{N,CD}()
 end
 
