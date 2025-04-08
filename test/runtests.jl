@@ -17,46 +17,49 @@ function run_all_tests(use_cuda=false)
     @testset "ShiftedVector" begin
         v = [1, 3, 5, 4]
         v = opt_cu(v, use_cuda);
-        @test all(v .== ShiftedVector(v))
+        # missing in a UnionType is not allowed for element-wise comparison of CuArrays with all
+        @test all(v .== ShiftedVector(v, default=0))
         sv = ShiftedVector(v, -1)
         @test isequal(sv, ShiftedVector(v, (-1,)))
         @test length(sv) == 4
-        @test all(sv[1:3] .== [3, 5, 4])
         @test ismissing(sv[4])
         diff = v .- sv
-        @test isequal(diff, [-2, -2, 1, missing])
+        @test isequal(diff, opt_cu([-2, -2, 1, missing], use_cuda))
+        # missing in a UnionType is not allowed for element-wise comparison of CuArrays with all
         @test shifts(sv) == (-1,)
         svneg = ShiftedVector(v, -1, default = -100)
         @test default(svneg) == -100
         @test copy(svneg) == coalesce.(sv, -100)
-        @test isequal(sv[1:3], Union{Int64, Missing}[3, 5, 4])
+        @test isequal(sv[1:3], opt_cu(Union{Int64, Missing}[3, 5, 4], use_cuda))
+        sv = ShiftedVector(v, -1, default=0)
+        @test all(sv[1:3] .== opt_cu([3, 5, 4], use_cuda))
         svnest = ShiftedVector(ShiftedVector(v, 1), 2)
         sv = ShiftedVector(v, 3)
         @test sv === svnest
         sv = ShiftedVector(v, 2, default = nothing)
         sv1 = ShiftedVector(sv, 1)
         sv2 = ShiftedVector(sv, 1, default = 0)
-        @test isequal(collect(sv1), [nothing, nothing, nothing, 1])
-        @test isequal(collect(sv2), [0, nothing, nothing, 1])
+        @test isequal(collect(sv1), opt_cu([nothing, nothing, nothing, 1], use_cuda))
+        @test isequal(collect(sv2), opt_cu([0, nothing, nothing, 1], use_cuda))
     end
     
     @testset "ShiftedArray" begin
         v = reshape(1:16, 4, 4)
         v = opt_cu(v, use_cuda);
-        @test all(v .== ShiftedArray(v))
+        @test all(v .== ShiftedArray(v, default=0))
         sv = ShiftedArray(v, (-2, 0))
         @test length(sv) == 16
-        @test sv[1, 3] == 11
+        CUDA.@allowscalar @test sv[1, 3] == 11
         @test ismissing(sv[3, 3])
         @test shifts(sv) == (-2,0)
         @test isequal(sv, ShiftedArray(v, -2))
         @test isequal(@inferred(ShiftedArray(v, (2,))), @inferred(ShiftedArray(v, 2)))
         @test isequal(@inferred(ShiftedArray(v)), @inferred(ShiftedArray(v, (0, 0))))
         s = ShiftedArray(v, (0, -2))
-        @test isequal(collect(s), [ 9 13 missing missing;
+        @test isequal(collect(s), opt_cu([ 9 13 missing missing;
                                    10 14 missing missing;
                                    11 15 missing missing;
-                                   12 16 missing missing])
+                                   12 16 missing missing], use_cuda))
         sneg = ShiftedArray(v, (0, -2), default = -100)
         @test all(sneg .== coalesce.(s, default(sneg)))
         @test checkbounds(Bool, sv, 2, 2)
@@ -67,14 +70,14 @@ function run_all_tests(use_cuda=false)
         sv = ShiftedArray(v, 2, default = nothing)
         sv1 = ShiftedArray(sv, (1, 1))
         sv2 = ShiftedArray(sv, (1, 1), default = 0)
-        @test isequal(collect(sv1), [nothing   nothing   nothing   nothing
+        @test isequal(collect(sv1), opt_cu([nothing   nothing   nothing   nothing
                                      nothing   nothing   nothing   nothing
                                      nothing   nothing   nothing   nothing
-                                     nothing  1         5         9      ])
-        @test isequal(collect(sv2), [0  0         0         0
+                                     nothing  1         5         9      ], use_cuda))
+        @test isequal(collect(sv2), opt_cu([0  0         0         0
                                      0   nothing   nothing   nothing
                                      0   nothing   nothing   nothing
-                                     0  1         5         9      ])
+                                     0  1         5         9      ], use_cuda))
     end
     
     @testset "padded_tuple" begin
@@ -105,19 +108,19 @@ function run_all_tests(use_cuda=false)
         @test length(sv) == 4
         @test all(sv .== opt_cu([3, 5, 4, 1], use_cuda))
         diff = v .- sv
-        @test diff == [-2, -2, 1, 3]
+        @test diff == opt_cu([-2, -2, 1, 3], use_cuda)
         @test shifts(sv) == (3,)
         sv2 = CircShiftedVector(v, 1)
         diff = v .- sv2
-        @test copy(sv2) == [4, 1, 3, 5]
+        @test copy(sv2) == opt_cu([4, 1, 3, 5], use_cuda)
         @test all(CircShiftedVector(v, 1) .== circshift(v, 1))
-        sv[2] = 0
-        @test collect(sv) == [3, 0, 4, 1]
-        @test v == [1, 3, 0, 4]
-        sv[3] = 12 
-        @test collect(sv) == [3, 0, 12, 1]
-        @test v == [1, 3, 0, 12]
-        @test sv === setindex!(sv, 12, 3) 
+        CUDA.@allowscalar sv[2] = 0
+        @test collect(sv) == opt_cu([3, 0, 4, 1], use_cuda)
+        @test v == opt_cu([1, 3, 0, 4], use_cuda)
+        CUDA.@allowscalar sv[3] = 12 
+        @test collect(sv) == opt_cu([3, 0, 12, 1], use_cuda)
+        @test v == opt_cu([1, 3, 0, 12], use_cuda)
+        CUDA.@allowscalar @test sv === setindex!(sv, 12, 3) 
         @test checkbounds(Bool, sv, 2)
         @test !checkbounds(Bool, sv, 123)
         sv = CircShiftedArray(v, 3)
@@ -131,16 +134,16 @@ function run_all_tests(use_cuda=false)
         @test all(v .== CircShiftedArray(v))
         sv = CircShiftedArray(v, (-2, 0))
         @test length(sv) == 16
-        @test sv[1, 3] == 11
+        CUDA.@allowscalar @test sv[1, 3] == 11
         @test shifts(sv) == (2, 0)
         @test isequal(sv, CircShiftedArray(v, -2))
         @test isequal(@inferred(CircShiftedArray(v, 2)), @inferred(CircShiftedArray(v, (2,))))
         @test isequal(@inferred(CircShiftedArray(v)), @inferred(CircShiftedArray(v, (0, 0))))
         s = CircShiftedArray(v, (0, 2))
-        @test isequal(collect(s), [ 9 13 1 5;
+        @test isequal(collect(s), opt_cu([ 9 13 1 5;
                                    10 14 2 6;
                                    11 15 3 7;
-                                   12 16 4 8])
+                                   12 16 4 8], use_cuda))
         sv = CircShiftedArray(v, 3)
         svnest = CircShiftedArray(CircShiftedArray(v, 2), 1)
         @test sv === svnest
@@ -159,6 +162,7 @@ function run_all_tests(use_cuda=false)
     
     @testset "fftshift and ifftshift" begin
         function test_fftshift(x, dims=1:ndims(x))
+            x = opt_cu(x, use_cuda)
             @test fftshift(x, dims) == ShiftedArrays.fftshift(x, dims)
             @test ifftshift(x, dims) == ShiftedArrays.ifftshift(x, dims)
         end
@@ -184,18 +188,18 @@ function run_all_tests(use_cuda=false)
         v = [1, 3, 8, 12]
         v = opt_cu(v, use_cuda);
         diff = v .- ShiftedArrays.lag(v)
-        @test isequal(diff, [missing, 2, 5, 4])
+        @test isequal(diff, opt_cu([missing, 2, 5, 4], use_cuda))
     
         diff2 = v .- ShiftedArrays.lag(v, 2)
-        @test isequal(diff2, [missing, missing, 7, 9])
+        @test isequal(diff2, opt_cu([missing, missing, 7, 9], use_cuda))
     
         @test all(ShiftedArrays.lag(v, 2, default = -100) .== coalesce.(ShiftedArrays.lag(v, 2), -100))
     
         diff = v .- ShiftedArrays.lead(v)
-        @test isequal(diff, [-2, -5, -4, missing])
+        @test isequal(diff, opt_cu([-2, -5, -4, missing], use_cuda))
     
         diff2 = v .- ShiftedArrays.lead(v, 2)
-        @test isequal(diff2, [-7, -9, missing, missing])
+        @test isequal(diff2, opt_cu([-7, -9, missing, missing], use_cuda))
     
         @test all(ShiftedArrays.lead(v, 2, default = -100) .== coalesce.(ShiftedArrays.lead(v, 2), -100))
     

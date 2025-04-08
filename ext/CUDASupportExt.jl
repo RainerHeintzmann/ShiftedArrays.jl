@@ -8,7 +8,7 @@ get_base_arr(arr::CuArray) = arr
 get_base_arr(arr::Array) = arr
 function get_base_arr(arr::AbstractArray) 
     p = parent(arr)
-    return (p == arr) ? arr : get_base_arr(parent(arr))
+    return (p === arr) ? arr : get_base_arr(parent(arr))
 end
 
 # define a number of Union types to not repeat all definitions for each type
@@ -28,10 +28,9 @@ AllSubArrayTypeCu{N, CD} = Union{SubArray{<:Any, <:Any, <:AllShiftedTypeCu{N,CD}
 AllShiftedAndViewsCu{N, CD} = Union{AllShiftedTypeCu{N, CD}, AllSubArrayTypeCu{N, CD}}
 
 Adapt.adapt_structure(to, x::CircShiftedArray{T, N, S}) where {T, N, S} = CircShiftedArray(adapt(to, parent(x)), shifts(x));
-Adapt.adapt_structure(to, x::ShiftedArray{T, V, N, S}) where {T, V, N, S} = ShiftedArray(adapt(to, parent(x)), shifts(x), default=V);
+Adapt.adapt_structure(to, x::ShiftedArray{T, V, N, S}) where {T, V, N, S} = ShiftedArray(adapt(to, parent(x)), shifts(x), default=ShiftedArrays.default(x));
 
 function Base.Broadcast.BroadcastStyle(::Type{T})  where {N, CD, T<:AllShiftedTypeCu{N, CD}}
-    @show "hi"
     CUDA.CuArrayStyle{N,CD}()
 end
 
@@ -84,6 +83,14 @@ end
 
 function Base.show(io::IO, mm::MIME"text/plain", cs::AllShiftedAndViews) 
     CUDA.@allowscalar invoke(Base.show, Tuple{IO, typeof(mm), AbstractArray}, io, mm, cs) 
+end
+
+# This version is needed to deal with range access of wrapped CuArrays.
+# ShiftedVector(cu([1,2,3,4,5]))[2:3]
+@inline function Base.getindex(s::AllShiftedTypeCu, x::Vararg{AbstractRange, N}) where {N}
+    v = @view s[x...]
+    res = similar(s.parent, eltype(s), size(v))
+    res .= v
 end
 
 end
