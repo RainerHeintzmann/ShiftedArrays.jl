@@ -214,6 +214,21 @@ if CUDA.functional()
     @testset "all in CUDA" begin
     CUDA.allowscalar(false);
     run_all_tests(true)
+
+    # some extra tests to check for indexing with integers
+    v = rand(10,11)
+    sv = ShiftedArray(cu(rand(10,11)), (3,4))
+    @test_throws ErrorException sv[5,6] 
+    @test (CUDA.@allowscalar sv[5,6]) == Array(sv)[5,6]
+    @test_throws ErrorException sv[47] 
+    @test_throws BoundsError sv[1,2,3] 
+    @test (CUDA.@allowscalar sv[47]) == Array(sv)[47]
+    cv = CircShiftedArray(cu(rand(10,11)), (3,4))
+    @test_throws ErrorException cv[5,6] 
+    @test (CUDA.@allowscalar cv[5,6]) == Array(cv)[5,6]
+    @test_throws ErrorException cv[47] 
+    @test_throws BoundsError cv[1,2,3] 
+    @test (CUDA.@allowscalar cv[47]) == Array(cv)[47]
     end
 else
     @testset "no CUDA available!" begin

@@ -12,20 +12,14 @@ function get_base_arr(arr::AbstractArray)
 end
 
 # define a number of Union types to not repeat all definitions for each type
-AllShiftedType = Union{CircShiftedArray{<:Any,<:Any,<:Any}, ShiftedArray{<:Any,<:Any,<:Any,<:Any}}
-
-# these are special only if a CuArray is wrapped
-
-AllSubArrayType = Union{SubArray{<:Any, <:Any, <:AllShiftedType, <:Any, <:Any},
-                        Base.ReshapedArray{<:Any, <:Any, <:AllShiftedType, <:Any},
-                        SubArray{<:Any, <:Any, <:Base.ReshapedArray{<:Any, <:Any, <:AllShiftedType, <:Any}, <:Any, <:Any}}
-AllShiftedAndViews = Union{AllShiftedType, AllSubArrayType}
-
-AllShiftedTypeCu{N, CD} = Union{CircShiftedArray{<:Any,<:Any,<:CuArray{<:Any,N,CD}}, ShiftedArray{<:Any,<:Any,<:Any,<:CuArray{<:Any,N,CD}}}
-AllSubArrayTypeCu{N, CD} = Union{SubArray{<:Any, <:Any, <:AllShiftedTypeCu{N,CD}, <:Any, <:Any},
-                                 Base.ReshapedArray{<:Any, <:Any, <:AllShiftedTypeCu{N,CD}, <:Any},
-                                 SubArray{<:Any, <:Any, <:Base.ReshapedArray{<:Any, <:Any, <:AllShiftedTypeCu{N,CD}, <:Any}, <:Any, <:Any}}
-AllShiftedAndViewsCu{N, CD} = Union{AllShiftedTypeCu{N, CD}, AllSubArrayTypeCu{N, CD}}
+AllShiftedTypeCu{N, CD} = Union{CircShiftedArray{<:Any,<:Any,<:CuArray{<:Any,N,CD}},
+                                ShiftedArray{<:Any,<:Any,<:Any,<:CuArray{<:Any,N,CD}}}
+AllShiftedTypeCuG{N, CD} = Union{AllShiftedTypeCu{N, CD}, CircShiftedArray{<:Any,<:Any,<:AllShiftedTypeCu{N,CD}},
+                                 ShiftedArray{<:Any,<:Any,<:Any,<:AllShiftedTypeCu{N,CD}}}
+AllSubArrayTypeCu{N, CD} = Union{SubArray{<:Any, <:Any, <:AllShiftedTypeCuG{N,CD}, <:Any, <:Any},
+                                 Base.ReshapedArray{<:Any, <:Any, <:AllShiftedTypeCuG{N,CD}, <:Any},
+                                 SubArray{<:Any, <:Any, <:Base.ReshapedArray{<:Any, <:Any, <:AllShiftedTypeCuG{N,CD}, <:Any}, <:Any, <:Any}}
+AllShiftedAndViewsCu{N, CD} = Union{AllShiftedTypeCuG{N, CD}, AllSubArrayTypeCu{N, CD}}
 
 Adapt.adapt_structure(to, x::CircShiftedArray{T, N, S}) where {T, N, S} = CircShiftedArray(adapt(to, parent(x)), shifts(x));
 Adapt.adapt_structure(to, x::ShiftedArray{T, V, N, S}) where {T, V, N, S} = ShiftedArray(adapt(to, parent(x)), shifts(x), default=ShiftedArrays.default(x));
@@ -40,17 +34,17 @@ function Base.Broadcast.BroadcastStyle(::Type{T})  where {N, CD, T<:AllSubArrayT
     CUDA.CuArrayStyle{N,CD}()
 end
 
-function Base.copy(s::AllShiftedAndViews)
+function Base.copy(s::AllShiftedAndViewsCu)
     res = similar(get_base_arr(s), eltype(s), size(s));
     res .= s
     return res
 end
 
-function Base.collect(x::AllShiftedAndViews) 
+function Base.collect(x::AllShiftedAndViewsCu) 
     return copy(x) # stay on the GPU        
 end
 
-function Base.Array(x::AllShiftedAndViews) 
+function Base.Array(x::AllShiftedAndViewsCu)
     return Array(copy(x)) # remove from GPU
 end
 
@@ -81,16 +75,25 @@ function Base.isapprox(x::AllShiftedAndViewsCu, y::AllShiftedAndViewsCu; atol=0,
     return all(abs.(x .- y) .<= atol)
 end
 
-function Base.show(io::IO, mm::MIME"text/plain", cs::AllShiftedAndViews) 
+function Base.show(io::IO, mm::MIME"text/plain", cs::AllShiftedAndViewsCu) 
     CUDA.@allowscalar invoke(Base.show, Tuple{IO, typeof(mm), AbstractArray}, io, mm, cs) 
 end
 
 # This version is needed to deal with range access of wrapped CuArrays.
 # ShiftedVector(cu([1,2,3,4,5]))[2:3]
-@inline function Base.getindex(s::AllShiftedTypeCu, x::Vararg{AbstractRange, N}) where {N}
+@inline function Base.getindex(s::AllShiftedTypeCu{N, CD}, x::Vararg{Union{AbstractRange, Int}, N}) where {N, CD}
     v = @view s[x...]
     res = similar(s.parent, eltype(s), size(v))
     res .= v
+end
+
+# This specializations are to ensure that true single element accesses generate an error, if allowscalar has not be specified.
+@inline function Base.getindex(s::ShiftedArray{A,B,C, <:CuArray{<:Any,N,CD}}, x::Vararg{Int, N}) where {A,B,C, N,CD}
+    invoke(ShiftedArrays.getindex, Tuple{ShiftedArray{A,B,C,<:AbstractArray}, ntuple((_)->Int, N)...}, s, x...)
+end
+
+@inline function Base.getindex(s::CircShiftedArray{A,B,<:CuArray{<:Any,N,CD}}, x::Vararg{Int, N}) where {A,B,N,CD}
+    invoke(ShiftedArrays.getindex, Tuple{CircShiftedArray{A,B,<:AbstractArray}, ntuple((_)->Int, N)...}, s, x...)
 end
 
 end
